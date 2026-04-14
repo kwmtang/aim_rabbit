@@ -152,7 +152,7 @@ class Game {
         
         this.rabbit = new Rabbit(this.canvas, this.difficulty);
         
-        this.canvas.addEventListener('click', (e) => this.handleClick(e));
+        this.canvas.addEventListener('pointerdown', (e) => this.handleClick(e));
         document.getElementById('restartBtn').addEventListener('click', () => this.restart());
         window.addEventListener('resize', () => this.handleResize());
         
