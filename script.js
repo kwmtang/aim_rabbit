@@ -1,39 +1,76 @@
+// JavaScript Delta-Time Based Smooth Animation Implementation
+
 class Rabbit {
     constructor() {
-        this.speed = 1;
-        this.hopCycle = 1;
+        this.position = {
+            x: 0,
+            y: 0
+        };
+        this.lastTime = 0;
     }
 
-    update(deltaTime) {
-        this.speed *= deltaTime;
-        this.hopCycle *= deltaTime;
-        // Additional logic for movement based on speed and hopCycle
+    update(currentTime) {
+        // Calculate delta time
+        let deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
+        this.lastTime = currentTime;
+
+        // Move the rabbit
+        this.position.x += 100 * deltaTime; // Example speed
+    }
+
+    draw(ctx) {
+        // Draw the rabbit
+        ctx.fillStyle = 'brown';
+        ctx.fillRect(this.position.x, this.position.y, 50, 50);
     }
 }
 
 class HitParticle {
-    constructor() {
-        // Initialization code
+    constructor(x, y) {
+        this.position = { x, y };
+        this.alpha = 1;
+        this.lastTime = 0;
     }
 
-    update(deltaTime) {
-        // Smooth physics logic here, adjusted by deltaTime
+    update(currentTime) {
+        let deltaTime = (currentTime - this.lastTime) / 1000;
+        this.alpha -= deltaTime * 0.5; // Fade out
+        this.lastTime = currentTime;
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = 'rgba(255, 0, 0, ' + this.alpha + ')';
+        ctx.fillRect(this.position.x, this.position.y, 10, 10);
+    }
+}
+
+class GameLoop {
+    constructor() {
+        this.rabbit = new Rabbit();
+        this.hitParticles = [];
+    }
+
+    update(currentTime) {
+        this.rabbit.update(currentTime);
+        this.hitParticles.forEach(particle => particle.update(currentTime));
+    }
+
+    draw(ctx) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        this.rabbit.draw(ctx);
+        this.hitParticles.forEach(particle => particle.draw(ctx));
+    }
+
+    start() {
+        const loop = (currentTime) => {
+            this.update(currentTime);
+            this.draw(ctx);
+            requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
     }
 }
 
-class Game {
-    constructor() {
-        this.lastFrameTime = 0;
-    }
-
-    gameLoop(currentTime) {
-        const deltaTime = (currentTime - this.lastFrameTime) / 1000; // Convert to seconds
-        this.lastFrameTime = currentTime;
-
-        // Update game objects here
-        rabbit.update(deltaTime);
-        // Other updates...
-
-        requestAnimationFrame(this.gameLoop.bind(this));
-    }
-}
+// Start the game loop
+const gameLoop = new GameLoop();
+gameLoop.start();
