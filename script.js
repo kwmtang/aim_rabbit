@@ -155,8 +155,16 @@ class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx    = this.canvas.getContext('2d');
-        this.canvas.width  = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+
+        // Overlay canvas: rabbit + particles drawn here so they appear
+        // above all HTML elements (HUD, title) at all times.
+        this.rabbitCanvas = document.getElementById('rabbitCanvas');
+        this.rctx         = this.rabbitCanvas.getContext('2d');
+
+        this.canvas.width        = window.innerWidth;
+        this.canvas.height       = window.innerHeight;
+        this.rabbitCanvas.width  = window.innerWidth;
+        this.rabbitCanvas.height = window.innerHeight;
 
         this.lives      = 10;
         this.hits       = 0;
@@ -168,10 +176,11 @@ class Game {
 
         this.rabbit = new Rabbit(this.canvas, this.difficulty);
 
-        // Timestamp of the previous rAF tick — used to compute dt
         this.lastTimestamp = null;
 
-        this.canvas.addEventListener('pointerdown', (e) => this.handleClick(e));
+        // Listen on the whole document so clicks over HTML elements
+        // (HUD, title) are still caught by the game.
+        document.addEventListener('pointerdown', (e) => this.handleClick(e));
         document.getElementById('restartBtn').addEventListener('click', () => this.restart());
         window.addEventListener('resize', () => this.handleResize());
 
@@ -180,10 +189,11 @@ class Game {
 
     handleClick(e) {
         if (this.isGameOver) return;
+        // restartBtn click should not count as a miss
+        if (e.target && e.target.id === 'restartBtn') return;
 
-        const rect   = this.canvas.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
+        const clickX = e.clientX;
+        const clickY = e.clientY;
 
         this.attempts++;
 
@@ -206,8 +216,10 @@ class Game {
     }
 
     handleResize() {
-        this.canvas.width  = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.canvas.width        = window.innerWidth;
+        this.canvas.height       = window.innerHeight;
+        this.rabbitCanvas.width  = window.innerWidth;
+        this.rabbitCanvas.height = window.innerHeight;
     }
 
     update(dt) {
@@ -231,14 +243,16 @@ class Game {
     }
 
     draw() {
+        // Background and ground on the main canvas (behind HTML elements)
         this.ctx.fillStyle = '#87ceeb';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
         this.ctx.fillStyle = '#90EE90';
         this.ctx.fillRect(0, this.canvas.height * 0.7, this.canvas.width, this.canvas.height * 0.3);
 
-        this.rabbit.draw(this.ctx);
-        this.particles.forEach(p => p.draw(this.ctx));
+        // Rabbit and particles on the overlay canvas (above HTML elements)
+        this.rctx.clearRect(0, 0, this.rabbitCanvas.width, this.rabbitCanvas.height);
+        this.rabbit.draw(this.rctx);
+        this.particles.forEach(p => p.draw(this.rctx));
     }
 
     updateHUD() {
@@ -295,6 +309,7 @@ class Game {
         this.isGameOver = false;
         this.reactionTimes = [];
         this.lastTimestamp = null;
+        this.rctx.clearRect(0, 0, this.rabbitCanvas.width, this.rabbitCanvas.height);
         this.rabbit = new Rabbit(this.canvas, this.difficulty);
         this.updateHUD();
     }
