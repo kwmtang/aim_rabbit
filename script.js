@@ -1,31 +1,39 @@
 class Rabbit {
+    constructor() {
+        this.speed = 1;
+        this.hopCycle = 1;
+    }
+
     update(deltaTime) {
-        // Scale movement by deltaTime for smooth motion
-        this.position.x += this.velocity.x * deltaTime;
-        this.position.y += this.velocity.y * deltaTime;
+        this.speed *= deltaTime;
+        this.hopCycle *= deltaTime;
+        // Additional logic for movement based on speed and hopCycle
     }
 }
 
 class HitParticle {
+    constructor() {
+        // Initialization code
+    }
+
     update(deltaTime) {
-        // Use deltaTime for velocity updates
-        this.position.x += this.velocity.x * deltaTime;
-        this.position.y += this.velocity.y * deltaTime;
+        // Smooth physics logic here, adjusted by deltaTime
     }
 }
 
 class Game {
-    gameLoop() {
-        const currentTime = Date.now();
-        const deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
-        this.lastTime = currentTime;
-
-        this.update(deltaTime);
-        requestAnimationFrame(this.gameLoop.bind(this));
+    constructor() {
+        this.lastFrameTime = 0;
     }
 
-    update(deltaTime) {
-        this.rabbit.update(deltaTime);
-        this.hitParticle.update(deltaTime);
+    gameLoop(currentTime) {
+        const deltaTime = (currentTime - this.lastFrameTime) / 1000; // Convert to seconds
+        this.lastFrameTime = currentTime;
+
+        // Update game objects here
+        rabbit.update(deltaTime);
+        // Other updates...
+
+        requestAnimationFrame(this.gameLoop.bind(this));
     }
 }
