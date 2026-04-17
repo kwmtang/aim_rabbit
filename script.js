@@ -1,76 +1,47 @@
-// JavaScript Delta-Time Based Smooth Animation Implementation
-
 class Rabbit {
     constructor() {
-        this.position = {
-            x: 0,
-            y: 0
-        };
-        this.lastTime = 0;
+        this.position = 0;
+        this.velocity = 0.1; // units per second
     }
 
-    update(currentTime) {
-        // Calculate delta time
-        let deltaTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
-        this.lastTime = currentTime;
-
-        // Move the rabbit
-        this.position.x += 100 * deltaTime; // Example speed
-    }
-
-    draw(ctx) {
-        // Draw the rabbit
-        ctx.fillStyle = 'brown';
-        ctx.fillRect(this.position.x, this.position.y, 50, 50);
+    update(deltaTime) {
+        this.position += this.velocity * deltaTime * 60; // scale movement by deltaTime
     }
 }
 
 class HitParticle {
-    constructor(x, y) {
-        this.position = { x, y };
-        this.alpha = 1;
-        this.lastTime = 0;
+    constructor() {
+        this.position = 0;
+        this.velocity = 0.05; // units per second
     }
 
-    update(currentTime) {
-        let deltaTime = (currentTime - this.lastTime) / 1000;
-        this.alpha -= deltaTime * 0.5; // Fade out
-        this.lastTime = currentTime;
-    }
-
-    draw(ctx) {
-        ctx.fillStyle = 'rgba(255, 0, 0, ' + this.alpha + ')';
-        ctx.fillRect(this.position.x, this.position.y, 10, 10);
+    update(deltaTime) {
+        this.position += this.velocity * deltaTime * 60; // smooth physics
     }
 }
 
-class GameLoop {
+class Game {
     constructor() {
         this.rabbit = new Rabbit();
-        this.hitParticles = [];
+        this.hitParticle = new HitParticle();
+        this.lastTimestamp = performance.now();
     }
 
-    update(currentTime) {
-        this.rabbit.update(currentTime);
-        this.hitParticles.forEach(particle => particle.update(currentTime));
-    }
+    gameLoop = () => {
+        const currentTimestamp = performance.now();
+        const deltaTime = (currentTimestamp - this.lastTimestamp) / 1000; // convert to seconds
+        this.lastTimestamp = currentTimestamp;
 
-    draw(ctx) {
-        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        this.rabbit.draw(ctx);
-        this.hitParticles.forEach(particle => particle.draw(ctx));
+        this.rabbit.update(deltaTime);
+        this.hitParticle.update(deltaTime);
+
+        requestAnimationFrame(this.gameLoop); // call next frame
     }
 
     start() {
-        const loop = (currentTime) => {
-            this.update(currentTime);
-            this.draw(ctx);
-            requestAnimationFrame(loop);
-        };
-        requestAnimationFrame(loop);
+        this.gameLoop(); // start the game loop
     }
 }
 
-// Start the game loop
-const gameLoop = new GameLoop();
-gameLoop.start();
+const game = new Game();
+game.start();
