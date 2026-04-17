@@ -19,11 +19,28 @@ h1 {
     text-shadow: 0 0 10px #00ff00;
     z-index: 100;
     font-size: 28px;
+    pointer-events: none;
 }
 
 #gameCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
     display: block;
     cursor: crosshair;
+    z-index: 1;
+}
+
+/* Overlay canvas: rabbit always drawn above HUD and title.
+   pointer-events: none so the HUD and restart button remain clickable. */
+#rabbitCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    display: block;
+    cursor: crosshair;
+    z-index: 200;
+    pointer-events: none;
 }
 
 #gameHUD {
@@ -40,6 +57,7 @@ h1 {
     border: 2px solid #00ff00;
     border-radius: 8px;
     font-family: 'Courier New', monospace;
+    pointer-events: none;
 }
 
 #gameHUD div {
@@ -63,7 +81,7 @@ h1 {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    z-index: 200;
+    z-index: 300; /* above canvas so restart button is clickable */
 }
 
 #gameOverScreen.hidden {
