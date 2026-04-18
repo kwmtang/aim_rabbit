@@ -4,32 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
-    <title>Rabbit Aiming Game</title>
+    <title>Aim Rabbit</title>
 </head>
 <body>
-    <h1>🐰 Rabbit Aiming Game</h1>
-    <div id="gameHUD">
-        <div>❤️ Lives: <span id="livesDisplay">10</span></div>
-        <div>🎯 Hits: <span id="hitsDisplay">0</span></div>
-        <div>📊 Accuracy: <span id="accuracyDisplay">0%</span></div>
-        <div>⚡ Avg Speed: <span id="speedDisplay">0ms</span></div>
-        <div>📈 Difficulty: <span id="difficultyDisplay">1</span></div>
-        <div>⏱️ Time: <span id="timerDisplay">10.0s</span></div>
-    </div>
-
-    <div id="gameOverScreen" class="hidden">
-        <h2>GAME OVER</h2>
-        <div class="stats">
-            <div>🎯 Final Hits: <span id="finalHits">0</span></div>
-            <div>📊 Accuracy: <span id="finalAccuracy">0</span>%</div>
-            <div>⚡ Avg Reaction Time: <span id="finalSpeed">0</span>ms</div>
-            <div>📈 Max Difficulty Reached: <span id="finalDifficulty">1</span></div>
-        </div>
-        <button id="restartBtn">START NEW GAME</button>
-    </div>
-
+    <canvas id="bgCanvas"></canvas>
     <canvas id="gameCanvas"></canvas>
-    <canvas id="rabbitCanvas"></canvas>
     <script src="script.js"></script>
 </body>
 </html>
