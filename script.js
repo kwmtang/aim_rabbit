@@ -292,19 +292,19 @@ class TacticalBunny {
     ctx.fill();
     ctx.stroke();
 
-    // ── Bunny head — round, soft, Easter-bunny shaped ────────────
-    ctx.fillStyle   = '#f9d0e8'; // pale pink, like a stuffed bunny
-    ctx.strokeStyle = '#d060a0';
+    // ── Bunny head — same pink as the body for a consistent suit look ──
+    ctx.fillStyle   = '#f06aaa'; // matches body color exactly
+    ctx.strokeStyle = '#c0407a';
     ctx.lineWidth   = r * 0.05;
     ctx.beginPath();
     ctx.ellipse(0, -r * 0.78, r * 0.56, r * 0.52, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Soft cheek puffs (makes the face look extra round and cute)
+    // Soft cheek puffs — slightly brighter to give the face dimension
     ctx.save();
-    ctx.globalAlpha = 0.35;
-    ctx.fillStyle   = '#ff88bb';
+    ctx.globalAlpha = 0.40;
+    ctx.fillStyle   = '#ff9ecb'; // matches belly highlight tone
     ctx.beginPath();
     ctx.ellipse(-r * 0.32, -r * 0.68, r * 0.18, r * 0.13, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -448,10 +448,21 @@ class TacticalBunny {
     ctx.restore();
   }
 
-  // Returns true if the click coordinates land on the bunny
+  // Returns true if the click coordinates land on the bunny (legacy, used in menus)
   isHit(lx, ly) {
     const dx = lx - this.x;
     const dy = ly - this.visualY;
+    return Math.sqrt(dx * dx + dy * dy) < this.radius * 1.1;
+  }
+
+  // FPS hit test: crosshair is fixed at screen center (BASE_W/2, BASE_H/2).
+  // The bunny's screen position = its world position minus the camera pan.
+  // A hit registers when the bunny's screen position is within radius of center.
+  isHitFPS(camX, camY) {
+    const screenX = this.x      - camX;  // bunny world X shifted by camera
+    const screenY = this.visualY - camY; // bunny world Y shifted by camera
+    const dx = screenX - BASE_W / 2;     // distance from screen center horizontally
+    const dy = screenY - BASE_H / 2;     // distance from screen center vertically
     return Math.sqrt(dx * dx + dy * dy) < this.radius * 1.1;
   }
 
@@ -764,34 +775,108 @@ class Game {
     this.floats  = []; // floating text labels
     this.flashes = []; // full-screen colour flashes
 
-    this.rabbit  = null; // the current active bunny (null when not playing)
-    this.lastTs  = null; // timestamp of the previous animation frame
+    this.rabbit   = null;  // the current active bunny (null when not playing)
+    this.lastTs   = null;  // timestamp of the previous animation frame
+    this.unlocked = false;     // true when paused (Escape pressed, lock released)
+    this.unlockReadyAt  = 0;   // timestamp after which re-lock click is accepted
+    this._pausedElapsed = 0;   // bunny timer snapshot taken at pause moment
 
-    // Mouse position in logical coordinates (used to draw the crosshair)
-    this.mx = BASE_W / 2;
-    this.my = BASE_H / 2;
+
+    // ── FPS camera state ─────────────────────────────────────────
+    // camX/camY track how far the world has been panned from center.
+    // Mouse movement changes these values; all world drawing is offset by them.
+    // The crosshair stays fixed at screen center — the world moves under it.
+    this.camX = 0;
+    this.camY = 0;
+
+    // How far (in logical px) the camera can pan from center.
+    // Must match WORLD_W/H below so the world never runs out.
+    // Bunny roams full BASE_W x BASE_H, so we need half a screen of pan each side.
+    this.CAM_LIMIT_X = BASE_W / 2;   // 640px — half the logical width
+    this.CAM_LIMIT_Y = BASE_H / 2;   // 360px — half the logical height
+
+    // Logical pixels of world movement per raw pixel of mouse movement.
+    // 1.2 feels natural — full pan takes about a 5-inch mouse sweep at 800 DPI.
+    this.SENSITIVITY = 1.2;
+
+    // True once the browser Pointer Lock API has captured the mouse
 
     // ── Subsystems ───────────────────────────────────────────────
     this.audio = new AudioEngine();
-    this.hist  = loadHistory(); // session history from localStorage
+    this.hist  = loadHistory();
 
-    // Track which countdown second we last beeped at (avoids duplicate beeps)
-    this._lastBeep  = -1;
-    // Cache for building window positions (regenerated on resize)
-    this._winCache  = null;
-    // The tip shown on the game-over screen — picked once when the game ends
+    this._lastBeep   = -1;
+    this._winCache   = null;
     this._currentTip = '';
 
     // ── Event listeners ──────────────────────────────────────────
     window.addEventListener('resize', () => this._resize());
-    // Track mouse position for the crosshair
-    this.bg.addEventListener('pointermove', e => {
-      const l = this._L(e.clientX, e.clientY);
-      this.mx = l.x;
-      this.my = l.y;
+
+    // FPS mouse panning — fires for every raw mouse movement pixel while locked.
+    // Guards: must have pointer lock and game must be active.
+    document.addEventListener('mousemove', e => {
+      if (document.pointerLockElement !== this.bg) return;
+      if (this.start || this.over) return;
+      this.camX = clamp(this.camX + e.movementX * this.SENSITIVITY, -this.CAM_LIMIT_X, this.CAM_LIMIT_X);
+      this.camY = clamp(this.camY + e.movementY * this.SENSITIVITY, -this.CAM_LIMIT_Y, this.CAM_LIMIT_Y);
     });
-    // All clicks route through _click() which handles each screen state
-    this.bg.addEventListener('pointerdown', e => this._click(e));
+
+
+
+    // When pointer lock is lost (always happens on Escape — browser enforced),
+    // enter the unlocked state: show cursor, show overlay. Game keeps running.
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement !== this.bg && !this.start && !this.over) {
+        this.unlocked = true;
+        // Snapshot how much of the bunny timer has elapsed so we can
+        // resume it accurately after the pause ends.
+        if (this.rabbit) this._pausedElapsed = this.rabbit.getElapsedTime();
+        // 1.5s cooldown — browser rejects requestPointerLock() immediately
+        // after Escape; waiting ensures the request will succeed reliably.
+        this.unlockReadyAt = performance.now() + 1500;
+        this.bg.style.cursor = 'default';
+      }
+    });
+
+    // When unlocked, a click re-acquires pointer lock.
+    // We use the Promise form so we only clear the unlocked state AFTER the browser
+    // confirms the lock is actually granted — no race condition possible.
+    document.addEventListener('pointerdown', e => {
+      if (this.unlocked && !this.start && !this.over) {
+        // Ignore clicks during the cooldown window — browser will reject them.
+        if (performance.now() < this.unlockReadyAt) return;
+        // Keep unlocked=true and overlay visible until Promise resolves.
+        const req = this.bg.requestPointerLock();
+        const onGranted = () => {
+          this.unlocked = false;
+          this.bg.style.cursor = 'none';
+          // Advance spawnTime so the bunny timer resumes from where it was paused
+          if (this.rabbit) {
+            this.rabbit.spawnTime = performance.now() - this._pausedElapsed;
+          }
+          // Reset lastTs so the first resumed frame has dt=0, not a huge spike
+          this.lastTs = null;
+        };
+        if (req && typeof req.then === 'function') {
+          // Modern browsers: Promise resolves only when lock is confirmed.
+          req.then(onGranted).catch(() => {
+            // Request rejected — stay in unlocked state, user can try again.
+          });
+        } else {
+          // Older browsers: no Promise. Use pointerlockchange as confirmation.
+          // Replace the general listener with a one-shot confirmation handler.
+          const confirm = () => {
+            if (document.pointerLockElement === this.bg) {
+              onGranted();
+            }
+            document.removeEventListener('pointerlockchange', confirm);
+          };
+          document.addEventListener('pointerlockchange', confirm);
+        }
+        return; // always swallow — never fire a shot on the re-lock click
+      }
+      this._click(e);
+    });
 
     // Kick off the animation loop
     requestAnimationFrame(ts => this._loop(ts));
@@ -827,10 +912,20 @@ class Game {
     const { x: lx, y: ly } = this._L(e.clientX, e.clientY);
     if (this.start) { this._clickStart(lx, ly); return; }
     if (this.over)  { this._clickOver(lx, ly);  return; }
-    // During gameplay: check if we hit the bunny
+
+    // Paused clicks are handled (and swallowed) by the pointerdown listener
+    // FPS mode: the crosshair is fixed at screen center; the world moves under it.
+    // We check if the bunny's screen position (world pos minus camera pan) is near center.
+    // Effects (particles, text) are created at the BUNNY'S WORLD position so they
+    // appear on the bunny and move with it as the camera continues to pan.
     this.attempts++;
-    if (this.rabbit && this.rabbit.isHit(lx, ly)) this._hit(lx, ly);
-    else this._miss(lx, ly);
+    if (this.rabbit && this.rabbit.isHitFPS(this.camX, this.camY)) {
+      this._hit(this.rabbit.x, this.rabbit.visualY);
+    } else {
+      // Miss flash appears at the bunny's world position too — shows where you nearly hit
+      this._miss(this.rabbit ? this.rabbit.x : BASE_W / 2,
+                 this.rabbit ? this.rabbit.visualY : BASE_H / 2);
+    }
   }
 
   // Handle clicks on the start screen — hit zone matches the drawn button at BASE_H * 0.60
@@ -899,16 +994,27 @@ class Game {
     this.lives  = this.LIVES;
     this.diff   = this.DIFF_START;
     this.start  = false;
+    this.unlocked = false;
+    this.unlockReadyAt  = 0;
+    this._pausedElapsed = 0;
     this.rabbit = this._newBunny();
     this._lastBeep = -1;
-    // Hide the native cursor during play — the canvas crosshair replaces it
+    // Reset camera to center so each game starts looking straight ahead
+    this.camX = 0;
+    this.camY = 0;
+    // Hide the OS cursor immediately — canvas crosshair takes over.
+    // Request pointer lock immediately — the START GAME click is a valid pointer gesture.
+    // pointerlockchange will fire with nowLocked=true; since _pendingResume=false here,
     this.bg.style.cursor = 'none';
+    this.bg.requestPointerLock();
   }
 
   // End the game, save result to history
   _end() {
     this.over   = true;
     this.rabbit = null;
+    // Release pointer lock so the player can click the PLAY AGAIN button normally
+    if (document.pointerLockElement) document.exitPointerLock();
     // Restore the normal cursor on the game-over screen
     this.bg.style.cursor = 'default';
     const acc   = this.attempts > 0 ? Math.round(this.hits / this.attempts * 100) : 0;
@@ -928,8 +1034,11 @@ class Game {
     this.rts      = []; this.streak   = 0; this.best = 0;
     this.parts    = []; this.misses   = []; this.floats = []; this.flashes = [];
     this.lastTs   = null; this._lastBeep = -1;
+    this.camX     = 0;   this.camY = 0; // reset camera to center
     this._go();
   }
+
+
 
   // ── Main animation loop ──────────────────────────────────────
   _loop(ts) {
@@ -945,7 +1054,7 @@ class Game {
 
   // ── Update all game logic each frame ────────────────────────
   _update(dt) {
-    if (this.start || this.over) return; // nothing to update on menu screens
+    if (this.start || this.over || this.unlocked) return; // frozen while paused
 
     if (this.rabbit) {
       this.rabbit.update(dt);
@@ -1014,29 +1123,159 @@ class Game {
     // Clip so nothing draws outside the game rectangle
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
 
-    // Sky: dark blue at the top fading to lighter blue at the horizon
-    const sg = ctx.createLinearGradient(0, 0, 0, H * 0.72);
-    sg.addColorStop(0,   '#1a1a3e');
-    sg.addColorStop(0.5, '#2d4a7a');
-    sg.addColorStop(1,   '#4a7aa8');
-    ctx.fillStyle = sg;
-    ctx.fillRect(0, 0, W, H * 0.72);
+    // The world is drawn LARGER than the viewport so panning never reveals an edge.
+    // WORLD size = viewport + 2 * max pan distance on each axis.
+    // At center pan the viewport shows the middle of the world rectangle.
+    const camOffX = (!this.start && !this.over) ? -this.camX * s : 0;
+    const camOffY = (!this.start && !this.over) ? -this.camY * s : 0;
 
-    // Ground: green grass on top, brown dirt below
-    const gg = ctx.createLinearGradient(0, H * 0.72, 0, H);
-    gg.addColorStop(0,   '#4a7c3f');
-    gg.addColorStop(0.1, '#3d6b34');
-    gg.addColorStop(0.4, '#8b6340');
-    gg.addColorStop(1,   '#6b4c2a');
-    ctx.fillStyle = gg;
-    ctx.fillRect(0, H * 0.72, W, H * 0.28);
+    // World dimensions in screen pixels — viewport plus full pan headroom
+    const WW = W + this.CAM_LIMIT_X * 2 * s;   // world width  (viewport + left+right pan)
+    const WH = H + this.CAM_LIMIT_Y * 2 * s;   // world height (viewport + top+bottom pan)
 
-    // Bright grass edge strip at the horizon line
-    ctx.fillStyle = '#5a9448';
-    ctx.fillRect(0, H * 0.72, W, H * 0.025);
+    // Top-left corner of the world rectangle in screen space.
+    // When cam is centered (camOff=0), the world is centered on the viewport.
+    const worldX = -(this.CAM_LIMIT_X * s) + camOffX;
+    const worldY = -(this.CAM_LIMIT_Y * s) + camOffY;
 
-    // Draw dark building silhouettes in the background
-    this._drawBuildings(ctx, W, H);
+    ctx.save();
+    ctx.translate(worldX, worldY);
+
+    // ── HOLODECK GRID BOX ────────────────────────────────────────────
+    // Deep black void background
+    ctx.fillStyle = '#050508';
+    ctx.fillRect(0, 0, WW, WH);
+
+    // Grid line color and glow — classic holodeck amber/gold on black
+    const GRID_COLOR  = 'rgba(255,180,40,0.55)';
+    const GRID_BRIGHT = 'rgba(255,200,80,0.85)';
+    const GRID_DIM    = 'rgba(255,160,20,0.25)';
+
+    // Grid cell size in world pixels
+    const CELL = Math.round(WW / 24);
+
+    ctx.lineWidth = 1;
+
+    // ── FLOOR (bottom 30% of world, perspective grid) ─────────────
+    // Horizon line at 70% down the world height
+    const horizon = WH * 0.70;
+
+    // Floor perspective grid — lines converge toward a vanishing point at horizon center
+    const vpX = WW / 2; // vanishing point X (center)
+
+    // Vertical floor lines (converge to horizon center)
+    const floorLineCount = 28;
+    for (let i = 0; i <= floorLineCount; i++) {
+      const t    = i / floorLineCount;
+      // Bottom edge spreads full world width; top edge converges to vpX
+      const bx   = t * WW;
+      const frac = Math.abs(t - 0.5) * 2; // 0=center, 1=edge
+      ctx.strokeStyle = frac > 0.8 ? GRID_DIM : GRID_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(vpX, horizon);           // vanishing point at horizon
+      ctx.lineTo(bx, WH);                 // spreads to bottom edge
+      ctx.stroke();
+    }
+
+    // Horizontal floor lines (equally spaced, lighter near horizon)
+    const floorRowCount = 14;
+    for (let i = 0; i <= floorRowCount; i++) {
+      // Use perspective: rows bunch up near horizon, spread at bottom
+      const t   = Math.pow(i / floorRowCount, 2.2); // quadratic easing
+      const y   = horizon + t * (WH - horizon);
+      const alpha = 0.15 + 0.7 * t; // faint near horizon, bright at bottom
+      ctx.strokeStyle = `rgba(255,180,40,${alpha * 0.6})`;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(WW, y);
+      ctx.stroke();
+    }
+
+    // Bright horizon line
+    ctx.strokeStyle = GRID_BRIGHT;
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, horizon);
+    ctx.lineTo(WW, horizon);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    // ── BACK WALL (top 70% — fills sky area with a flat grid) ─────
+    // Vertical lines on back wall
+    for (let x = 0; x <= WW; x += CELL) {
+      const frac = Math.abs((x / WW) - 0.5) * 2;
+      ctx.strokeStyle = frac > 0.85 ? GRID_DIM : GRID_COLOR;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, horizon);
+      ctx.stroke();
+    }
+
+    // Horizontal lines on back wall — bunched near horizon (perspective)
+    const wallRowCount = 12;
+    for (let i = 0; i <= wallRowCount; i++) {
+      const t   = 1 - Math.pow(1 - i / wallRowCount, 2.2);
+      const y   = t * horizon;
+      const alpha = 0.1 + 0.6 * (1 - t);
+      ctx.strokeStyle = `rgba(255,180,40,${alpha * 0.7})`;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(WW, y);
+      ctx.stroke();
+    }
+
+    // Top edge line
+    ctx.strokeStyle = GRID_BRIGHT;
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(WW, 0);
+    ctx.stroke();
+
+    // ── LEFT WALL (perspective panel on left side) ─────────────────
+    const leftEdge = WW * 0.08; // how far the left wall panel extends inward
+    const wallRows = 8;
+    for (let i = 0; i <= wallRows; i++) {
+      const y  = (i / wallRows) * horizon;
+      ctx.strokeStyle = GRID_DIM;
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(leftEdge, horizon * (i / wallRows));
+      ctx.stroke();
+    }
+
+    // ── RIGHT WALL (mirror of left) ────────────────────────────────
+    const rightEdge = WW * 0.92;
+    for (let i = 0; i <= wallRows; i++) {
+      const y = (i / wallRows) * horizon;
+      ctx.strokeStyle = GRID_DIM;
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(WW, y);
+      ctx.lineTo(rightEdge, horizon * (i / wallRows));
+      ctx.stroke();
+    }
+
+    // ── CORNER ACCENT LINES (reinforce the box feeling) ────────────
+    ctx.strokeStyle = GRID_BRIGHT;
+    ctx.lineWidth   = 2;
+    // Four corner-to-vanishing-point lines
+    ctx.beginPath(); ctx.moveTo(0,   0);       ctx.lineTo(vpX, horizon); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(WW,  0);       ctx.lineTo(vpX, horizon); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,   WH);      ctx.lineTo(vpX, horizon); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(WW,  WH);      ctx.lineTo(vpX, horizon); ctx.stroke();
+    ctx.lineWidth = 1;
+
+    // ── Subtle ambient glow at vanishing point ─────────────────────
+    const vg = ctx.createRadialGradient(vpX, horizon, 0, vpX, horizon, WW * 0.25);
+    vg.addColorStop(0,   'rgba(255,160,20,0.12)');
+    vg.addColorStop(1,   'rgba(255,160,20,0)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, WW, WH);
+
+    // Restore before drawing the HUD — HUD must NOT pan with the world
+    ctx.restore();
 
     // Draw the HUD (lives, hits, timer bar, etc.) only during active gameplay
     if (!this.start && !this.over) this._drawHUD(ctx, W, H);
@@ -1044,45 +1283,14 @@ class Game {
     ctx.restore();
   }
 
-  // Draw dark city building silhouettes with lit windows
-  _drawBuildings(ctx, W, H) {
-    // Each entry is [x, y, width, height] as fractions of the canvas size
-    const bldgs = [
-      [0.05, 0.55, 0.07, 0.17],
-      [0.10, 0.45, 0.05, 0.27],
-      [0.14, 0.50, 0.08, 0.22],
-      [0.82, 0.48, 0.06, 0.24],
-      [0.87, 0.52, 0.09, 0.20],
-      [0.93, 0.44, 0.05, 0.28],
-    ];
-
-    // Build the window position cache once (avoids random flicker every frame)
-    if (!this._winCache) {
-      this._winCache = bldgs.map(([bx, by, bw, bh]) => {
-        const wins = [];
-        for (let wy = by * BASE_H + BASE_H * 0.02; wy < (by + bh * 0.72) * BASE_H - BASE_H * 0.02; wy += BASE_H * 0.04)
-          for (let wx = bx * BASE_W + BASE_W * 0.01; wx < (bx + bw) * BASE_W - BASE_W * 0.01; wx += BASE_W * 0.018)
-            if (Math.random() > 0.35) wins.push([wx / BASE_W, wy / BASE_H]);
-        return wins;
-      });
-    }
-
-    bldgs.forEach(([bx, by, bw, bh], i) => {
-      // Dark building silhouette
-      ctx.fillStyle = 'rgba(15,15,35,0.7)';
-      ctx.fillRect(bx * W, by * H, bw * W, bh * H * 0.72);
-      // Warm yellow lit windows
-      ctx.fillStyle = 'rgba(255,230,100,0.22)';
-      this._winCache[i].forEach(([wx, wy]) => ctx.fillRect(wx * W, wy * H, W * 0.008, H * 0.02));
-    });
-  }
 
   // Draw the in-game HUD: timer bar, stats panel, title badge
   _drawHUD(ctx, W, H) {
 
     // ── Timer bar (top center of screen) ──────────────────────────
     if (this.rabbit) {
-      const el   = this.rabbit.getElapsedTime();
+      // Show frozen elapsed time while paused so the bar does not advance
+      const el   = this.unlocked ? this._pausedElapsed : this.rabbit.getElapsedTime();
       const frac = clamp(1 - el / this.rabbit.timeLimit, 0, 1); // 1=full, 0=empty
       const bW   = W * 0.30; const bH = H * 0.034;
       const bX   = W / 2 - bW / 2; const bY = H * 0.022;
@@ -1185,21 +1393,128 @@ class Game {
     } else if (this.over) {
       this._drawGameOver(ctx);
     } else {
-      // Active gameplay: bunny, effects, crosshair
+      // Apply camera pan to bunny and effects.
+      // The world background starts at -CAM_LIMIT (top-left corner) in logical space,
+      // but bunny coords are 0..BASE_W. We offset so both share the same coordinate space:
+      //   world top-left is at (-CAM_LIMIT_X, -CAM_LIMIT_Y) in screen logical coords
+      //   + camera pan offset
+      // Net bunny offset = -camX keeps bunny aligned with the scrolling world.
+      ctx.save();
+      ctx.translate(-this.camX, -this.camY);
+
       if (this.rabbit) this.rabbit.draw(ctx);
       this.parts.forEach(p  => p.draw(ctx));
       this.misses.forEach(m => m.draw(ctx));
       this.floats.forEach(f => f.draw(ctx));
-      this.flashes.forEach(f => f.draw(ctx, BASE_W, BASE_H));
-      this._drawCrosshair(ctx); // drawn last so it's always on top
+
+      ctx.restore(); // restore before drawing screen-space effects and crosshair
+
+      this.flashes.forEach(f => f.draw(ctx, BASE_W, BASE_H)); // full-screen, no pan
+
+      if (this.unlocked) {
+        // Lock lost — show a clear overlay so the user is never in a mystery state
+        this._drawRelockOverlay(ctx);
+      } else {
+        this._drawCrosshair(ctx);
+      }
     }
 
     ctx.restore();
   }
 
-  // Draw the custom crosshair at the current mouse position
+  // Shown when pointer lock is lost mid-game (e.g. Escape pressed).
+  // Game keeps running so the player can see what's happening.
+  _drawRelockOverlay(ctx) {
+    const now       = performance.now();
+    const remaining = Math.max(0, this.unlockReadyAt - now);
+    const ready     = remaining === 0;
+
+    // Semi-transparent dark overlay
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(0, 0, BASE_W, BASE_H);
+
+    ctx.textAlign = 'center';
+
+    if (!ready) {
+      // ── Cooldown: show a countdown ring and "Please wait" ──────────────
+      const secs    = Math.ceil(remaining / 1000);
+      const frac    = 1 - remaining / 1500; // 0→1 over the 1.5s window
+      const cx      = BASE_W / 2;
+      const cy      = BASE_H / 2 - BASE_H * 0.04;
+      const radius  = BASE_H * 0.09;
+
+      // PAUSED title above the ring
+      ctx.fillStyle   = '#ff80cc';
+      ctx.font        = `bold ${Math.round(BASE_H * 0.065)}px Arial`;
+      ctx.shadowColor = '#ff2080'; ctx.shadowBlur = 20;
+      ctx.fillText('PAUSED', BASE_W / 2, BASE_H / 2 - BASE_H * 0.22);
+      ctx.shadowBlur = 0;
+
+      // Background ring
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth   = BASE_H * 0.018;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Progress arc — fills clockwise as the cooldown expires
+      ctx.strokeStyle = '#ff80cc';
+      ctx.lineWidth   = BASE_H * 0.018;
+      ctx.lineCap     = 'round';
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+      ctx.stroke();
+
+      // Countdown number inside the ring
+      ctx.fillStyle = '#ffffff';
+      ctx.font      = `bold ${Math.round(BASE_H * 0.07)}px Arial`;
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 8;
+      ctx.fillText(secs, cx, cy + BASE_H * 0.028);
+      ctx.shadowBlur = 0;
+
+      // Label below ring
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font      = `${Math.round(BASE_H * 0.030)}px Arial`;
+      ctx.fillText('PAUSED  —  resuming in a moment…', BASE_W / 2, BASE_H / 2 + BASE_H * 0.13);
+
+    } else {
+      // ── Ready: draw a proper glowing button ────────────────────────────
+      const bW = BASE_W * 0.38;
+      const bH = BASE_H * 0.11;
+      const bX = BASE_W / 2 - bW / 2;
+      const bY = BASE_H / 2 - bH / 2 - BASE_H * 0.04;
+
+      // Glow
+      ctx.shadowColor = '#ff60cc';
+      ctx.shadowBlur  = 28;
+      ctx.fillStyle   = '#cc2088';
+      ctx.strokeStyle = '#ff80cc';
+      ctx.lineWidth   = 3;
+      ctx.beginPath();
+      ctx.roundRect(bX, bY, bW, bH, bH / 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Button label
+      ctx.fillStyle = '#ffffff';
+      ctx.font      = `bold ${Math.round(bH * 0.44)}px Arial`;
+      ctx.fillText('▶  Click to Resume', BASE_W / 2, bY + bH * 0.65);
+
+      // Sub-label
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font      = `${Math.round(BASE_H * 0.028)}px Arial`;
+      ctx.fillText('Game is paused — bunny and timer are frozen', BASE_W / 2, bY + bH + BASE_H * 0.045);
+    }
+
+    ctx.textAlign = 'left';
+  }
+
+  // Draw the crosshair fixed at the center of the screen.
+  // In FPS mode the crosshair never moves — the world moves under it.
   _drawCrosshair(ctx) {
-    const x = this.mx; const y = this.my;
+    const x = BASE_W / 2; // always horizontal center
+    const y = BASE_H / 2; // always vertical center
     const gap = 10;  // space between center dot and lines
     const len = 14;  // length of each crosshair line
 
@@ -1219,6 +1534,7 @@ class Game {
     ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
+
 
   // ═══════════════════════════════════════════════════
   //  START SCREEN
@@ -1245,7 +1561,9 @@ class Game {
     // Instruction
     ctx.fillStyle = '#ffeeaa';
     ctx.font      = `${Math.round(BASE_H * 0.034)}px Arial`;
-    ctx.fillText('Click the hopping bunny before the timer runs out', BASE_W / 2, BASE_H * 0.43);
+    ctx.fillText('Move your mouse to aim — click to shoot the hopping bunny', BASE_W / 2, BASE_H * 0.43);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font      = `${Math.round(BASE_H * 0.028)}px Arial`;
 
     // START button — centred with comfortable spacing below the text
     this._drawButton(ctx, BASE_W / 2, BASE_H * 0.60, 280, 62, '▶  START GAME', '#e0208a', '#ff60cc');
