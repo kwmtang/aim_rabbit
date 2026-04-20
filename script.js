@@ -208,239 +208,208 @@ class TacticalBunny {
     this.flashAlpha = rem < 3 ? (Math.sin(performance.now() * 0.012) + 1) * 0.28 : 0;
   }
 
-  // Draw the full Easter Bunny character onto the canvas
+  // Draw a plush pink Easter bunny.
   draw(ctx) {
     const r        = this.radius;
     const x        = this.x;
     const y        = this.visualY;
     const onGround = this.hopState === HOP_STATES.LANDED;
+    const airFrac  = clamp(this.hopZ / (r * 1.5), 0, 1);
+    const scaleX   = onGround ? 1.15 : lerp(1, 0.82, airFrac);
+    const scaleY   = onGround ? 0.85 : lerp(1, 1.20, airFrac);
+    const aa       = Math.sin(this.armSwing) * 0.45;
 
-    // Squish flat when landing, stretch tall when in the air (cartoon feel)
-    const airFrac = clamp(this.hopZ / (r * 1.5), 0, 1);
-    const scaleX  = onGround ? 1.15 : lerp(1, 0.82, airFrac);
-    const scaleY  = onGround ? 0.85 : lerp(1, 1.20, airFrac);
-
-    // Arm swing angle (alternates forward/back like running arms)
-    const aa = Math.sin(this.armSwing) * 0.45;
-
-    // Position, rotate, and scale the whole character as one unit
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(this.tilt);
     ctx.scale(scaleX, scaleY);
 
-    // ── Ground shadow (appears below the bunny when airborne) ─────
+    // ── Shadow ────────────────────────────────────────────────────
     if (this.hopZ > 2) {
-      const shadowScale = clamp(1 - this.hopZ / 120, 0.3, 1);
-      const shadowY     = (this.groundY - y) / scaleY + r * 0.15;
+      const ss = clamp(1 - this.hopZ / 120, 0.3, 1);
+      const sy = (this.groundY - y) / scaleY + r * 0.15;
       ctx.save();
-      ctx.globalAlpha = 0.22 * shadowScale;
-      ctx.fillStyle   = '#000';
+      ctx.globalAlpha = 0.20 * ss;
+      ctx.fillStyle = '#000';
       ctx.beginPath();
-      ctx.ellipse(0, shadowY, r * 0.9 * shadowScale, r * 0.2 * shadowScale, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, sy, r*0.9*ss, r*0.2*ss, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
     }
 
-    // ── Back arm (drawn first so the body covers it) ──────────────
+    // ── Back arm — at shoulder height (top of body) ───────────────
     _drawArm(ctx, r, -1, -aa, true);
 
-    // ── Legs with white paw boots ─────────────────────────────────
-    const legSwing = Math.sin(this.armSwing + Math.PI) * (onGround ? 0.18 : 0.08);
+    // ── Legs / feet — big rounded plush feet with gingham pads ───
+    const legSwing = Math.sin(this.armSwing + Math.PI) * (onGround ? 0.15 : 0.06);
     for (const [side, sw] of [[-1, legSwing], [1, -legSwing]]) {
       ctx.save();
-      ctx.translate(side * r * 0.26, r * 0.6);
+      ctx.translate(side * r * 0.30, r * 0.62);
       ctx.rotate(sw);
-      // Pink leg
-      ctx.fillStyle   = '#f080b8';
-      ctx.strokeStyle = '#c0407a';
+      // Upper leg
+      ctx.fillStyle   = '#f090bb';
+      ctx.strokeStyle = '#cc5090';
       ctx.lineWidth   = r * 0.04;
       ctx.beginPath();
-      ctx.ellipse(0, r * 0.3, r * 0.2, r * 0.38, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      // White fluffy paw/boot at the bottom
-      ctx.fillStyle = '#fff8fc';
+      ctx.ellipse(0, r*0.18, r*0.22, r*0.28, 0, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+      // Big plush foot
+      ctx.fillStyle   = '#f090bb';
       ctx.beginPath();
-      ctx.ellipse(0, r * 0.62, r * 0.24, r * 0.15, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      ctx.ellipse(side*r*0.10, r*0.52, r*0.30, r*0.18, 0, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+      // Gingham foot pad
+      ctx.fillStyle   = '#fff0f5';
+      ctx.strokeStyle = '#f0c0d8';
+      ctx.lineWidth   = r * 0.025;
+      ctx.beginPath();
+      ctx.ellipse(side*r*0.10, r*0.54, r*0.20, r*0.11, 0, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(side*r*0.10, r*0.54, r*0.20, r*0.11, 0, 0, Math.PI*2);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(240,150,190,0.55)';
+      ctx.lineWidth   = r * 0.018;
+      const gx = side*r*0.10, gy = r*0.54, gw = r*0.20, gh = r*0.11;
+      const step = r * 0.07;
+      for (let xx = gx-gw; xx <= gx+gw; xx += step) {
+        ctx.beginPath(); ctx.moveTo(xx, gy-gh*2); ctx.lineTo(xx, gy+gh*2); ctx.stroke();
+      }
+      for (let yy = gy-gh; yy <= gy+gh; yy += step) {
+        ctx.beginPath(); ctx.moveTo(gx-gw*2, yy); ctx.lineTo(gx+gw*2, yy); ctx.stroke();
+      }
+      ctx.restore();
       ctx.restore();
     }
 
-    // ── Body — clean pink bunny suit, no decorations ──────────────
-    ctx.fillStyle   = '#f06aaa';
-    ctx.strokeStyle = '#c0407a';
-    ctx.lineWidth   = r * 0.055;
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.12, r * 0.68, r * 0.82, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Slightly lighter belly patch in the center (gives the suit some shape)
-    ctx.fillStyle = '#ff9ecb';
-    ctx.beginPath();
-    ctx.ellipse(0, r * 0.15, r * 0.35, r * 0.55, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ── Neck connector between body and head ─────────────────────
-    ctx.fillStyle   = '#f080b8';
-    ctx.strokeStyle = '#c0407a';
-    ctx.lineWidth   = r * 0.03;
-    ctx.beginPath();
-    ctx.ellipse(0, -r * 0.28, r * 0.28, r * 0.16, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // ── Bunny head — same pink as the body for a consistent suit look ──
-    ctx.fillStyle   = '#f06aaa'; // matches body color exactly
-    ctx.strokeStyle = '#c0407a';
+    // ── Body — round plush torso ──────────────────────────────────
+    ctx.fillStyle   = '#f090bb';
+    ctx.strokeStyle = '#cc5090';
     ctx.lineWidth   = r * 0.05;
     ctx.beginPath();
-    ctx.ellipse(0, -r * 0.78, r * 0.56, r * 0.52, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.ellipse(0, r*0.10, r*0.70, r*0.80, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
 
-    // Soft cheek puffs — slightly brighter to give the face dimension
-    ctx.save();
-    ctx.globalAlpha = 0.40;
-    ctx.fillStyle   = '#ff9ecb'; // matches belly highlight tone
+    // Fuller centered belly highlight — covers full front of torso
+    ctx.fillStyle = 'rgba(255,210,230,0.50)';
     ctx.beginPath();
-    ctx.ellipse(-r * 0.32, -r * 0.68, r * 0.18, r * 0.13, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, r*0.12, r*0.42, r*0.60, 0, 0, Math.PI*2);
     ctx.fill();
+    // Inner belly glow for depth
+    ctx.fillStyle = 'rgba(255,230,242,0.30)';
     ctx.beginPath();
-    ctx.ellipse( r * 0.32, -r * 0.68, r * 0.18, r * 0.13, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, r*0.08, r*0.24, r*0.38, 0, 0, Math.PI*2);
     ctx.fill();
-    ctx.restore();
 
-    // ── Tall bunny ears (drawn before hair so hair sits on top) ───
-    const earWiggle = Math.sin(performance.now() * 0.0018) * 0.07;
-    for (const [ex, baseRot] of [[-r * 0.24, -0.08], [r * 0.24, 0.08]]) {
+    // ── Head — large round plush head ─────────────────────────────
+    ctx.fillStyle   = '#f090bb';
+    ctx.strokeStyle = '#cc5090';
+    ctx.lineWidth   = r * 0.05;
+    ctx.beginPath();
+    ctx.ellipse(0, -r*0.80, r*0.58, r*0.55, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+
+    // ── Ears — rooted at TOP of head, not sides ───────────────────
+    // Ear roots sit on top of the head at y = -r*1.32 (head top = -r*0.80 - r*0.55)
+    const earWiggle = Math.sin(performance.now() * 0.0018) * 0.06;
+    for (const [ex, baseRot] of [[-r*0.20, -0.12], [r*0.20, 0.12]]) {
       ctx.save();
-      ctx.translate(ex, -r * 1.24);
+      // Anchor at the top of the head, ears extend upward from there
+      ctx.translate(ex, -r*1.30);
       ctx.rotate(baseRot + earWiggle * (ex < 0 ? 1 : -1));
-      // Outer ear — white/pale pink
-      ctx.fillStyle   = '#fff0f5';
-      ctx.strokeStyle = '#e0a0c8';
+      // Outer ear — pink plush, tall oval rooted at bottom
+      ctx.fillStyle   = '#f090bb';
+      ctx.strokeStyle = '#cc5090';
       ctx.lineWidth   = r * 0.04;
       ctx.beginPath();
-      ctx.ellipse(0, 0, r * 0.22, r * 0.66, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      // Inner ear — bright pink stripe
-      ctx.fillStyle = '#ff80b8';
+      // Center of ellipse is r*0.55 above the anchor so bottom edge meets anchor point
+      ctx.ellipse(0, -r*0.55, r*0.22, r*0.58, 0, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+      // Inner ear — gingham white base
+      ctx.fillStyle   = '#fff0f5';
+      ctx.strokeStyle = '#f0c0d8';
+      ctx.lineWidth   = r * 0.025;
       ctx.beginPath();
-      ctx.ellipse(0, 0, r * 0.11, r * 0.46, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.ellipse(0, -r*0.55, r*0.13, r*0.44, 0, 0, Math.PI*2);
+      ctx.fill(); ctx.stroke();
+      // Gingham grid clipped to inner ear
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0, -r*0.55, r*0.13, r*0.44, 0, 0, Math.PI*2);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(240,150,190,0.55)';
+      ctx.lineWidth   = r * 0.018;
+      for (let xx = -r*0.14; xx <= r*0.14; xx += r*0.07) {
+        ctx.beginPath(); ctx.moveTo(xx, -r*1.05); ctx.lineTo(xx, r*0.10); ctx.stroke();
+      }
+      for (let yy = -r*1.02; yy <= r*0.05; yy += r*0.07) {
+        ctx.beginPath(); ctx.moveTo(-r*0.15, yy); ctx.lineTo(r*0.15, yy); ctx.stroke();
+      }
+      ctx.restore();
       ctx.restore();
     }
 
-    // ── Fluffy top-of-head fur (covers where ears meet the head) ──
-    ctx.fillStyle   = '#fce0f0';
-    ctx.strokeStyle = '#e090c8';
-    ctx.lineWidth   = r * 0.025;
+    // ── White muzzle patch ────────────────────────────────────────
+    ctx.fillStyle   = '#fff8fc';
+    ctx.strokeStyle = '#f0d0e0';
+    ctx.lineWidth   = r * 0.03;
     ctx.beginPath();
-    ctx.ellipse(0, -r * 1.08, r * 0.48, r * 0.20, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -r*0.68, r*0.36, r*0.30, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+
+    // Muzzle highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(-r*0.08, -r*0.72, r*0.16, r*0.12, -0.3, 0, Math.PI*2);
     ctx.fill();
 
-    // ── Big round cute eyes ───────────────────────────────────────
-    // White sclera
-    ctx.fillStyle = '#fff';
+    // ── Sparkly bead eyes ─────────────────────────────────────────
+    for (const ex of [-r*0.22, r*0.22]) {
+      const eg = ctx.createRadialGradient(ex-r*0.03, -r*0.83, 0, ex, -r*0.80, r*0.10);
+      eg.addColorStop(0, '#ff60aa');
+      eg.addColorStop(0.4, '#990040');
+      eg.addColorStop(1, '#330015');
+      ctx.fillStyle = eg;
+      ctx.beginPath();
+      ctx.arc(ex, -r*0.80, r*0.10, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.90)';
+      ctx.beginPath();
+      ctx.ellipse(ex - r*0.04, -r*0.84, r*0.045, r*0.055, -0.5, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ex + r*0.04, -r*0.77, r*0.020, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // ── Nose ──────────────────────────────────────────────────────
+    ctx.fillStyle = '#e05080';
     ctx.beginPath();
-    ctx.ellipse(-r * 0.21, -r * 0.80, r * 0.17, r * 0.17, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -r*0.60, r*0.07, r*0.05, 0, 0, Math.PI*2);
     ctx.fill();
+    ctx.fillStyle = 'rgba(255,180,200,0.7)';
     ctx.beginPath();
-    ctx.ellipse( r * 0.21, -r * 0.80, r * 0.17, r * 0.17, 0, 0, Math.PI * 2);
+    ctx.ellipse(-r*0.02, -r*0.62, r*0.03, r*0.022, -0.3, 0, Math.PI*2);
     ctx.fill();
 
-    // Coloured iris — warm amber/brown (classic Easter bunny look)
-    ctx.fillStyle = '#8B4513';
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.21, -r * 0.80, r * 0.11, r * 0.12, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.ellipse( r * 0.21, -r * 0.80, r * 0.11, r * 0.12, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Dark pupils
-    ctx.fillStyle = '#1a0800';
-    ctx.beginPath();
-    ctx.arc(-r * 0.21, -r * 0.80, r * 0.065, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc( r * 0.21, -r * 0.80, r * 0.065, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Anime-style eye sparkle highlights
-    ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.beginPath(); ctx.arc(-r * 0.17, -r * 0.84, r * 0.04,  0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(-r * 0.25, -r * 0.77, r * 0.022, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc( r * 0.25, -r * 0.84, r * 0.04,  0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc( r * 0.17, -r * 0.77, r * 0.022, 0, Math.PI * 2); ctx.fill();
-
-    // Curved top eyelid line (makes eyes look soft and friendly)
-    ctx.strokeStyle = '#5c1a00';
-    ctx.lineWidth   = r * 0.038;
+    // ── Smile ─────────────────────────────────────────────────────
+    ctx.strokeStyle = '#cc4466';
+    ctx.lineWidth   = r * 0.040;
     ctx.lineCap     = 'round';
     ctx.beginPath();
-    ctx.arc(-r * 0.21, -r * 0.80, r * 0.17, Math.PI * 1.15, Math.PI * 1.85);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc( r * 0.21, -r * 0.80, r * 0.17, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.arc(0, -r*0.62, r*0.14, 0.25, Math.PI - 0.25);
     ctx.stroke();
 
-    // ── Bunny nose — small pink heart-shaped blob ─────────────────
-    ctx.fillStyle = '#ff88b0';
-    ctx.beginPath();
-    ctx.ellipse(0, -r * 0.63, r * 0.09, r * 0.07, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ── Smile line ───────────────────────────────────────────────
-    ctx.strokeStyle = '#d0507a';
-    ctx.lineWidth   = r * 0.045;
-    ctx.beginPath();
-    ctx.arc(0, -r * 0.56, r * 0.11, 0.2, Math.PI - 0.2);
-    ctx.stroke();
-
-    // ── Whiskers (three lines each side) ─────────────────────────
-    ctx.strokeStyle = 'rgba(180,80,120,0.55)';
-    ctx.lineWidth   = r * 0.025;
-    ctx.lineCap     = 'round';
-    // Left whiskers
-    for (const [x1, y1, x2, y2] of [
-      [-r*0.10, -r*0.60,  -r*0.42, -r*0.58],
-      [-r*0.10, -r*0.62,  -r*0.42, -r*0.65],
-      [-r*0.10, -r*0.64,  -r*0.42, -r*0.72],
-    ]) { ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
-    // Right whiskers
-    for (const [x1, y1, x2, y2] of [
-      [r*0.10, -r*0.60,   r*0.42, -r*0.58],
-      [r*0.10, -r*0.62,   r*0.42, -r*0.65],
-      [r*0.10, -r*0.64,   r*0.42, -r*0.72],
-    ]) { ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
-
-    // ── Shoulder area — clean rounded bumps, no decorations ───────
-    ctx.fillStyle   = '#e8609a';
-    ctx.strokeStyle = '#b03070';
-    ctx.lineWidth   = r * 0.04;
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.74, -r * 0.10, r * 0.26, r * 0.19, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.ellipse( r * 0.74, -r * 0.10, r * 0.26, r * 0.19, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // ── Front arm (drawn last so it appears in front of the body) ─
+    // ── Front arm — at shoulder height ────────────────────────────
     _drawArm(ctx, r, 1, aa, false);
 
-    // ── Urgency flash — red glow when timer is almost up ──────────
+    // ── Urgency flash ─────────────────────────────────────────────
     if (this.flashAlpha > 0) {
       ctx.globalAlpha = this.flashAlpha;
       ctx.fillStyle   = '#ff1060';
       ctx.beginPath();
-      ctx.ellipse(0, 0, r * 1.2, r * 1.55, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, r*1.2, r*1.55, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.globalAlpha = 1;
     }
@@ -448,22 +417,84 @@ class TacticalBunny {
     ctx.restore();
   }
 
-  // Returns true if the click coordinates land on the bunny (legacy, used in menus)
-  isHit(lx, ly) {
-    const dx = lx - this.x;
-    const dy = ly - this.visualY;
-    return Math.sqrt(dx * dx + dy * dy) < this.radius * 1.1;
+  // ── HIT DETECTION HELPERS
+
+  // ── HIT DETECTION HELPERS ────────────────────────────────────────────────
+  // Test if a point (px, py) is inside an axis-aligned ellipse.
+  // cx/cy = ellipse center, rx/ry = semi-axes.
+  _inEllipse(px, py, cx, cy, rx, ry) {
+    const dx = (px - cx) / rx;
+    const dy = (py - cy) / ry;
+    return dx * dx + dy * dy < 1;
   }
 
-  // FPS hit test: crosshair is fixed at screen center (BASE_W/2, BASE_H/2).
-  // The bunny's screen position = its world position minus the camera pan.
-  // A hit registers when the bunny's screen position is within radius of center.
+  // Transform a world-space point into the bunny's LOCAL coordinate space,
+  // undoing the same translate → rotate(tilt) → scale(scaleX, scaleY) that draw() applies.
+  // Returns {lx, ly} in the bunny's unscaled, unrotated local frame.
+  _toLocal(wx, wy) {
+    // Step 1: translate so bunny center is the origin
+    let dx = wx - this.x;
+    let dy = wy - this.visualY;
+    // Step 2: undo tilt rotation
+    const cos = Math.cos(-this.tilt);
+    const sin = Math.sin(-this.tilt);
+    const rx  = dx * cos - dy * sin;
+    const ry  = dx * sin + dy * cos;
+    // Step 3: undo squish/stretch scale
+    const onGround = this.hopState === HOP_STATES.LANDED;
+    const airFrac  = clamp(this.hopZ / (this.radius * 1.5), 0, 1);
+    const scaleX   = onGround ? 1.15 : lerp(1, 0.82, airFrac);
+    const scaleY   = onGround ? 0.85 : lerp(1, 1.20, airFrac);
+    return { lx: rx / scaleX, ly: ry / scaleY };
+  }
+
+  // Test a local-space point against every visible body part.
+  // Returns true if the point lands on any drawn part of the bunny.
+  _hitsAnyPart(lx, ly) {
+    const r   = this.radius;
+    const E   = this._inEllipse.bind(this);
+
+    // ── Torso & head mass ──────────────────────────────────────────
+    if (E(lx, ly, 0,       r*0.12,  r*0.68, r*0.82)) return true; // body
+    if (E(lx, ly, 0,      -r*0.78,  r*0.56, r*0.52)) return true; // head
+    if (E(lx, ly, 0,      -r*0.28,  r*0.28, r*0.16)) return true; // neck
+
+    // ── Ears — anchor at (±r*0.20, -r*1.30), ellipse center r*0.55 above anchor.
+    // Ear center ≈ (±r*0.20, -r*1.85). Cover with tall ellipse including wiggle.
+    if (E(lx, ly, -r*0.20, -r*1.85, r*0.32, r*0.65)) return true; // left ear
+    if (E(lx, ly,  r*0.20, -r*1.85, r*0.32, r*0.65)) return true; // right ear
+
+    // ── Shoulders — at top of body where arms attach (±r*0.65, -r*0.30)
+    if (E(lx, ly, -r*0.68, -r*0.30, r*0.26, r*0.19)) return true; // left shoulder
+    if (E(lx, ly,  r*0.68, -r*0.30, r*0.26, r*0.19)) return true; // right shoulder
+
+    // ── Arms — pivot at (±r*0.65, -r*0.30), arm+paw reach to ~r*0.32 below pivot.
+    // Cover zone: center midway between pivot and paw tip, tall enough for swing arc.
+    if (E(lx, ly, -r*0.65, -r*0.08, r*0.48, r*0.52)) return true; // left arm zone
+    if (E(lx, ly,  r*0.65, -r*0.08, r*0.48, r*0.52)) return true; // right arm zone
+
+    // ── Legs & boots ───────────────────────────────────────────────
+    // Legs pivot at (±r*0.26, r*0.6) and swing a small angle.
+    // Combined leg+boot height ≈ r*0.77, use an enclosing ellipse.
+    if (E(lx, ly, -r*0.26, r*0.95, r*0.28, r*0.40)) return true; // left leg+boot
+    if (E(lx, ly,  r*0.26, r*0.95, r*0.28, r*0.40)) return true; // right leg+boot
+
+    return false;
+  }
+
+  // Legacy hit test (used on start/game-over screens where there's no camera).
+  isHit(lx, ly) {
+    const { lx: plx, ly: ply } = this._toLocal(lx, ly);
+    return this._hitsAnyPart(plx, ply);
+  }
+
+  // FPS hit test: transforms screen-center into bunny local space, then tests all parts.
   isHitFPS(camX, camY) {
-    const screenX = this.x      - camX;  // bunny world X shifted by camera
-    const screenY = this.visualY - camY; // bunny world Y shifted by camera
-    const dx = screenX - BASE_W / 2;     // distance from screen center horizontally
-    const dy = screenY - BASE_H / 2;     // distance from screen center vertically
-    return Math.sqrt(dx * dx + dy * dy) < this.radius * 1.1;
+    // The crosshair is fixed at screen center; convert to world space first.
+    const worldX = BASE_W / 2 + camX;
+    const worldY = BASE_H / 2 + camY;
+    const { lx, ly } = this._toLocal(worldX, worldY);
+    return this._hitsAnyPart(lx, ly);
   }
 
   // How many milliseconds have passed since this bunny spawned
@@ -475,23 +506,39 @@ class TacticalBunny {
 
 // ─── Shared helper: draw one arm (called twice — back arm before body, front after)
 function _drawArm(ctx, r, side, angle, back) {
+  // Arms pivot at shoulder height — top of the body
   ctx.save();
-  ctx.translate(side * r * 0.68, -r * 0.05);
+  ctx.translate(side * r * 0.65, -r * 0.30);
   ctx.rotate(side * angle);
-  // Arm — slightly darker pink than the body so it reads separately
-  ctx.fillStyle   = back ? '#c03070' : '#e8609a';
-  ctx.strokeStyle = '#a02050';
+  // Upper arm (pink plush)
+  ctx.fillStyle   = back ? '#e87aaa' : '#f090bb';
+  ctx.strokeStyle = '#cc5090';
   ctx.lineWidth   = r * 0.04;
   ctx.beginPath();
-  ctx.ellipse(0, r * 0.3, r * 0.18, r * 0.36, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  // White fluffy paw at the end of the arm
-  ctx.fillStyle = '#fff8fc';
+  ctx.ellipse(0, r * 0.28, r * 0.22, r * 0.36, 0, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // Gingham paw/hand at the end of the arm
+  const px = 0, py = r * 0.62, pr = r * 0.20;
+  ctx.fillStyle   = '#fff0f5';
+  ctx.strokeStyle = '#f0c0d8';
+  ctx.lineWidth   = r * 0.025;
   ctx.beginPath();
-  ctx.ellipse(0, r * 0.58, r * 0.17, r * 0.14, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  ctx.arc(px, py, pr, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+  // Gingham grid on paw
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, pr, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(240,150,190,0.55)';
+  ctx.lineWidth   = r * 0.018;
+  for (let xx = px-pr; xx <= px+pr; xx += r*0.08) {
+    ctx.beginPath(); ctx.moveTo(xx, py-pr*1.5); ctx.lineTo(xx, py+pr*1.5); ctx.stroke();
+  }
+  for (let yy = py-pr; yy <= py+pr; yy += r*0.08) {
+    ctx.beginPath(); ctx.moveTo(px-pr*1.5, yy); ctx.lineTo(px+pr*1.5, yy); ctx.stroke();
+  }
+  ctx.restore();
   ctx.restore();
 }
 
@@ -878,6 +925,13 @@ class Game {
       this._click(e);
     });
 
+    // ── Touch / mouse detection ──────────────────────────────────────────
+    // Pointer Lock requires a real mouse. Detect touch-only devices and
+    // show a clear message instead of a broken experience.
+    // We check: no fine pointer (mouse) AND touch is available.
+    this.noMouse = !window.matchMedia('(pointer: fine)').matches &&
+                    ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
     // Kick off the animation loop
     requestAnimationFrame(ts => this._loop(ts));
   }
@@ -930,6 +984,7 @@ class Game {
 
   // Handle clicks on the start screen — hit zone matches the drawn button at BASE_H * 0.60
   _clickStart(lx, ly) {
+    if (this.noMouse) return; // blocked on touch devices
     if (lx > BASE_W/2 - 140 && lx < BASE_W/2 + 140 &&
         ly > BASE_H * 0.60 - 31 && ly < BASE_H * 0.60 + 31) {
       this._go();
@@ -1388,7 +1443,9 @@ class Game {
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
     ctx.scale(s, s); // everything drawn after this is in logical coordinates
 
-    if (this.start) {
+    if (this.noMouse) {
+      this._drawNoMouseScreen(ctx);
+    } else if (this.start) {
       this._drawStartScreen(ctx);
     } else if (this.over) {
       this._drawGameOver(ctx);
@@ -1535,6 +1592,35 @@ class Game {
     ctx.restore();
   }
 
+
+  // Shown on touch/mobile devices — game requires a real mouse for pointer lock
+  _drawNoMouseScreen(ctx) {
+    ctx.fillStyle = 'rgba(0,0,0,0.82)';
+    ctx.fillRect(0, 0, BASE_W, BASE_H);
+
+    // Big emoji
+    ctx.font      = `${Math.round(BASE_H * 0.13)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.fillText('🖱️', BASE_W / 2, BASE_H * 0.30);
+
+    // Title
+    ctx.fillStyle   = '#ff80cc';
+    ctx.font        = `bold ${Math.round(BASE_H * 0.07)}px Arial`;
+    ctx.shadowColor = '#ff2080'; ctx.shadowBlur = 20;
+    ctx.fillText('Mouse Required', BASE_W / 2, BASE_H * 0.46);
+    ctx.shadowBlur  = 0;
+
+    // Explanation
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font      = `${Math.round(BASE_H * 0.038)}px Arial`;
+    ctx.fillText('Aim Rabbit uses FPS pointer lock controls', BASE_W / 2, BASE_H * 0.57);
+    ctx.fillText('and requires a mouse to play.', BASE_W / 2, BASE_H * 0.635);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.40)';
+    ctx.font      = `${Math.round(BASE_H * 0.028)}px Arial`;
+    ctx.fillText('Please open this game on a desktop or laptop with a mouse.', BASE_W / 2, BASE_H * 0.74);
+    ctx.textAlign = 'left';
+  }
 
   // ═══════════════════════════════════════════════════
   //  START SCREEN
