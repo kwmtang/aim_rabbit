@@ -11,7 +11,9 @@ const TARGET_FPS = 60;   // The framerate all speeds are designed for
 const ASPECT_W   = 16;   // Widescreen ratio width  (16:9)
 const ASPECT_H   = 9;    // Widescreen ratio height (16:9)
 const BASE_W     = 1280; // Logical canvas width  in pixels
-const BASE_H     = 720;  // Logical canvas height in pixels
+const BASE_H     = 720;
+// Single sans-serif font stack used everywhere for consistency
+const FONT       = "Arial, 'Helvetica Neue', sans-serif";  // Logical canvas height in pixels
 
 // The three states a hop can be in: going up, coming down, or on the ground
 const HOP_STATES = { RISING: 0, FALLING: 1, LANDED: 2 };
@@ -1396,7 +1398,7 @@ class Game {
       ['🔥', 'Streak',   `${this.streak}  best ${this.best}`],
     ];
 
-    ctx.font = `bold ${fs}px 'Courier New', monospace`;
+    ctx.font = `bold ${fs}px ${FONT}`;
     const labelX = px + pW * 0.07; // labels start near left edge
     const valueX = px + pW - pW * 0.05; // values are right-aligned near right edge
 
@@ -1598,27 +1600,46 @@ class Game {
     ctx.fillStyle = 'rgba(0,0,0,0.82)';
     ctx.fillRect(0, 0, BASE_W, BASE_H);
 
-    // Big emoji
-    ctx.font      = `${Math.round(BASE_H * 0.13)}px Arial`;
     ctx.textAlign = 'center';
-    ctx.fillText('🖱️', BASE_W / 2, BASE_H * 0.30);
+
+    // Mouse emoji
+    ctx.font      = `${Math.round(BASE_H * 0.12)}px ${FONT}`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('🖱️', BASE_W / 2, BASE_H * 0.28);
 
     // Title
     ctx.fillStyle   = '#ff80cc';
-    ctx.font        = `bold ${Math.round(BASE_H * 0.07)}px Arial`;
-    ctx.shadowColor = '#ff2080'; ctx.shadowBlur = 20;
-    ctx.fillText('Mouse Required', BASE_W / 2, BASE_H * 0.46);
+    ctx.font        = `bold ${Math.round(BASE_H * 0.065)}px ${FONT}`;
+    ctx.shadowColor = '#ff2080'; ctx.shadowBlur = 18;
+    ctx.fillText('Mouse Required', BASE_W / 2, BASE_H * 0.42);
     ctx.shadowBlur  = 0;
 
-    // Explanation
-    ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    ctx.font      = `${Math.round(BASE_H * 0.038)}px Arial`;
-    ctx.fillText('Aim Rabbit uses FPS pointer lock controls', BASE_W / 2, BASE_H * 0.57);
-    ctx.fillText('and requires a mouse to play.', BASE_W / 2, BASE_H * 0.635);
+    // Body lines — kept short so each fits on one line at any scale
+    const bodySize = Math.round(BASE_H * 0.036);
+    ctx.fillStyle = 'rgba(255,255,255,0.78)';
+    ctx.font      = `${bodySize}px ${FONT}`;
+    const lineH   = bodySize * 1.55;
+    const lines   = [
+      'This game uses FPS pointer lock controls',
+      'and requires a physical mouse to play.',
+    ];
+    lines.forEach((line, i) => {
+      ctx.fillText(line, BASE_W / 2, BASE_H * 0.54 + i * lineH);
+    });
 
-    ctx.fillStyle = 'rgba(255,255,255,0.40)';
-    ctx.font      = `${Math.round(BASE_H * 0.028)}px Arial`;
-    ctx.fillText('Please open this game on a desktop or laptop with a mouse.', BASE_W / 2, BASE_H * 0.74);
+    // Sub-note — two short lines instead of one long one
+    const subSize = Math.round(BASE_H * 0.026);
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.font      = `${subSize}px ${FONT}`;
+    const subLineH = subSize * 1.55;
+    const subLines = [
+      'Please open on a desktop or laptop',
+      'with a mouse connected.',
+    ];
+    subLines.forEach((line, i) => {
+      ctx.fillText(line, BASE_W / 2, BASE_H * 0.67 + i * subLineH);
+    });
+
     ctx.textAlign = 'left';
   }
 
@@ -1695,7 +1716,7 @@ class Game {
     ];
 
     const lh2 = ph / (stats.length + 1); // evenly space rows inside the panel
-    ctx.font = `bold ${Math.round(BASE_H * 0.037)}px 'Courier New', monospace`;
+    ctx.font = `bold ${Math.round(BASE_H * 0.037)}px ${FONT}`;
     stats.forEach(([icon, label, value], i) => {
       const ty = spy + lh2 * (i + 0.85);
       ctx.fillStyle = '#ffccee'; ctx.textAlign = 'left';
