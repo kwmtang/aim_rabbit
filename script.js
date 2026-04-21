@@ -304,28 +304,19 @@ class TacticalBunny {
     ctx.ellipse(0, r*0.08, r*0.24, r*0.38, 0, 0, Math.PI*2);
     ctx.fill();
 
-    // ── Head — large round plush head ─────────────────────────────
-    ctx.fillStyle   = '#f090bb';
-    ctx.strokeStyle = '#cc5090';
-    ctx.lineWidth   = r * 0.05;
-    ctx.beginPath();
-    ctx.ellipse(0, -r*0.80, r*0.58, r*0.55, 0, 0, Math.PI*2);
-    ctx.fill(); ctx.stroke();
-
-    // ── Ears — rooted at TOP of head, not sides ───────────────────
-    // Ear roots sit on top of the head at y = -r*1.32 (head top = -r*0.80 - r*0.55)
+    // ── Ears — drawn BEFORE head so head covers the ear bases ──────
+    // This prevents a visible gap/crack at the top of the head.
+    // Ears — simple ellipses rooted at top of head ────────────
     const earWiggle = Math.sin(performance.now() * 0.0018) * 0.06;
-    for (const [ex, baseRot] of [[-r*0.20, -0.12], [r*0.20, 0.12]]) {
+    for (const [ex, baseRot] of [[-r*0.20, -0.10], [r*0.20, 0.10]]) {
       ctx.save();
-      // Anchor at the top of the head, ears extend upward from there
       ctx.translate(ex, -r*1.30);
       ctx.rotate(baseRot + earWiggle * (ex < 0 ? 1 : -1));
-      // Outer ear — pink plush, tall oval rooted at bottom
+      // Outer ear — pink plush
       ctx.fillStyle   = '#f090bb';
       ctx.strokeStyle = '#cc5090';
       ctx.lineWidth   = r * 0.04;
       ctx.beginPath();
-      // Center of ellipse is r*0.55 above the anchor so bottom edge meets anchor point
       ctx.ellipse(0, -r*0.55, r*0.22, r*0.58, 0, 0, Math.PI*2);
       ctx.fill(); ctx.stroke();
       // Inner ear — gingham white base
@@ -352,55 +343,74 @@ class TacticalBunny {
       ctx.restore();
     }
 
+    // ── Head — drawn AFTER ears so it covers their bases cleanly ──
+    ctx.fillStyle   = '#f090bb';
+    ctx.strokeStyle = '#cc5090';
+    ctx.lineWidth   = r * 0.05;
+    ctx.beginPath();
+    ctx.ellipse(0, -r*0.80, r*0.58, r*0.55, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+
     // ── White muzzle patch ────────────────────────────────────────
     ctx.fillStyle   = '#fff8fc';
     ctx.strokeStyle = '#f0d0e0';
     ctx.lineWidth   = r * 0.03;
     ctx.beginPath();
-    ctx.ellipse(0, -r*0.68, r*0.36, r*0.30, 0, 0, Math.PI*2);
+    ctx.ellipse(0, -r*0.66, r*0.34, r*0.28, 0, 0, Math.PI*2);
     ctx.fill(); ctx.stroke();
 
-    // Muzzle highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.beginPath();
-    ctx.ellipse(-r*0.08, -r*0.72, r*0.16, r*0.12, -0.3, 0, Math.PI*2);
-    ctx.fill();
-
-    // ── Sparkly bead eyes ─────────────────────────────────────────
+    // ── Eyes — large round cartoon eyes like the reference ────────
+    // Dark circle with sparkle, no separate sclera (full dark eye)
     for (const ex of [-r*0.22, r*0.22]) {
-      const eg = ctx.createRadialGradient(ex-r*0.03, -r*0.83, 0, ex, -r*0.80, r*0.10);
-      eg.addColorStop(0, '#ff60aa');
-      eg.addColorStop(0.4, '#990040');
-      eg.addColorStop(1, '#330015');
-      ctx.fillStyle = eg;
+      // Outer eye circle (very dark, almost black)
+      ctx.fillStyle = '#1a0010';
       ctx.beginPath();
-      ctx.arc(ex, -r*0.80, r*0.10, 0, Math.PI*2);
+      ctx.arc(ex, -r*0.82, r*0.125, 0, Math.PI*2);
       ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.90)';
+      // Large oval sparkle highlight (top-left of eye)
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.beginPath();
-      ctx.ellipse(ex - r*0.04, -r*0.84, r*0.045, r*0.055, -0.5, 0, Math.PI*2);
+      ctx.ellipse(ex - r*0.055, -r*0.875, r*0.055, r*0.065, -0.4, 0, Math.PI*2);
       ctx.fill();
+      // Small secondary glint (bottom-right)
       ctx.beginPath();
-      ctx.arc(ex + r*0.04, -r*0.77, r*0.020, 0, Math.PI*2);
+      ctx.arc(ex + r*0.055, -r*0.775, r*0.025, 0, Math.PI*2);
       ctx.fill();
     }
 
-    // ── Nose ──────────────────────────────────────────────────────
-    ctx.fillStyle = '#e05080';
+    // ── Nose + mouth connected in reference style ─────────────────
+    // Nose: small inverted triangle / heart bottom, sitting above muzzle center
+    ctx.fillStyle   = '#d04060';
+    ctx.strokeStyle = '#c03050';
+    ctx.lineWidth   = r * 0.025;
     ctx.beginPath();
-    ctx.ellipse(0, -r*0.60, r*0.07, r*0.05, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,180,200,0.7)';
-    ctx.beginPath();
-    ctx.ellipse(-r*0.02, -r*0.62, r*0.03, r*0.022, -0.3, 0, Math.PI*2);
-    ctx.fill();
+    // Heart-bottom nose shape: two bumps meeting at a point below
+    ctx.moveTo(0, -r*0.555); // bottom point (connects to mouth line)
+    ctx.quadraticCurveTo(-r*0.065, -r*0.56, -r*0.07, -r*0.60);
+    ctx.quadraticCurveTo(-r*0.07,  -r*0.64,  0,       -r*0.62);
+    ctx.quadraticCurveTo( r*0.07,  -r*0.64,  r*0.07, -r*0.60);
+    ctx.quadraticCurveTo( r*0.065, -r*0.56,  0,      -r*0.555);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
 
-    // ── Smile ─────────────────────────────────────────────────────
-    ctx.strokeStyle = '#cc4466';
-    ctx.lineWidth   = r * 0.040;
+    // Vertical line connecting nose bottom to mouth center
+    ctx.strokeStyle = '#c03050';
+    ctx.lineWidth   = r * 0.032;
     ctx.lineCap     = 'round';
     ctx.beginPath();
-    ctx.arc(0, -r*0.62, r*0.14, 0.25, Math.PI - 0.25);
+    ctx.moveTo(0, -r*0.555);
+    ctx.lineTo(0, -r*0.510);
+    ctx.stroke();
+
+    // Double-wave W mouth: two small downward curves side by side
+    ctx.strokeStyle = '#c03050';
+    ctx.lineWidth   = r * 0.038;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-r*0.14, -r*0.510);            // start left
+    ctx.quadraticCurveTo(-r*0.07, -r*0.460, 0,       -r*0.510); // left hump down
+    ctx.quadraticCurveTo( r*0.07, -r*0.460,  r*0.14, -r*0.510); // right hump down
     ctx.stroke();
 
     // ── Front arm — at shoulder height ────────────────────────────
@@ -418,8 +428,6 @@ class TacticalBunny {
 
     ctx.restore();
   }
-
-  // ── HIT DETECTION HELPERS
 
   // ── HIT DETECTION HELPERS ────────────────────────────────────────────────
   // Test if a point (px, py) is inside an axis-aligned ellipse.
@@ -1537,33 +1545,21 @@ class Game {
       ctx.fillText('PAUSED  —  resuming in a moment…', BASE_W / 2, BASE_H / 2 + BASE_H * 0.13);
 
     } else {
-      // ── Ready: draw a proper glowing button ────────────────────────────
-      const bW = BASE_W * 0.38;
-      const bH = BASE_H * 0.11;
-      const bX = BASE_W / 2 - bW / 2;
-      const bY = BASE_H / 2 - bH / 2 - BASE_H * 0.04;
+      // ── Ready: plain text prompt — no fake button ─────────────────────
+      // We deliberately avoid a button shape because the whole screen is clickable.
+      ctx.fillStyle   = '#ff80cc';
+      ctx.font        = `bold ${Math.round(BASE_H * 0.065)}px ${FONT}`;
+      ctx.shadowColor = '#ff2080'; ctx.shadowBlur = 20;
+      ctx.fillText('PAUSED', BASE_W / 2, BASE_H / 2 - BASE_H * 0.08);
+      ctx.shadowBlur  = 0;
 
-      // Glow
-      ctx.shadowColor = '#ff60cc';
-      ctx.shadowBlur  = 28;
-      ctx.fillStyle   = '#cc2088';
-      ctx.strokeStyle = '#ff80cc';
-      ctx.lineWidth   = 3;
-      ctx.beginPath();
-      ctx.roundRect(bX, bY, bW, bH, bH / 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.88)';
+      ctx.font      = `${Math.round(BASE_H * 0.042)}px ${FONT}`;
+      ctx.fillText('Click anywhere to resume', BASE_W / 2, BASE_H / 2 + BASE_H * 0.04);
 
-      // Button label
-      ctx.fillStyle = '#ffffff';
-      ctx.font      = `bold ${Math.round(bH * 0.44)}px Arial`;
-      ctx.fillText('▶  Click to Resume', BASE_W / 2, bY + bH * 0.65);
-
-      // Sub-label
-      ctx.fillStyle = 'rgba(255,255,255,0.45)';
-      ctx.font      = `${Math.round(BASE_H * 0.028)}px Arial`;
-      ctx.fillText('Game is paused — bunny and timer are frozen', BASE_W / 2, bY + bH + BASE_H * 0.045);
+      ctx.fillStyle = 'rgba(255,255,255,0.42)';
+      ctx.font      = `${Math.round(BASE_H * 0.028)}px ${FONT}`;
+      ctx.fillText('Bunny and timer are frozen', BASE_W / 2, BASE_H / 2 + BASE_H * 0.10);
     }
 
     ctx.textAlign = 'left';
@@ -1748,7 +1744,8 @@ class Game {
     // Score number
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.font      = `${Math.round(BASE_H * 0.028)}px Arial`;
-    ctx.fillText(`Score: ${acc - clamp(Math.round((avg - 500) / 50), 0, 30)}`, gpx + gpw / 2, gpy + gph * 0.84);
+    const penalty = avg > 0 ? clamp(Math.round((avg - 800) / 100), 0, 15) : 0;
+    ctx.fillText(`Score: ${acc - penalty}`, gpx + gpw / 2, gpy + gph * 0.84);
     ctx.textAlign = 'left';
 
     // ── Tip of the run (locked in at _end() so it never flickers) ─
@@ -1762,15 +1759,20 @@ class Game {
     this._drawButton(ctx, BASE_W / 2, BASE_H * 0.885, 280, 62, '▶  PLAY AGAIN', '#990040', '#ff2080');
   }
 
-  // Calculate the performance grade based on accuracy and average reaction time
+  // Calculate the performance grade based on accuracy and average reaction time.
+  // Calibrated against typical aim trainer benchmarks (Kovaaks / Aimlabs style):
+  //   - Accuracy is the primary driver; most players peak at 60-85% on moving targets
+  //   - Reaction time penalty only applies above 800ms (very slow), max 15 points
+  //   - This means a 70% accuracy player with good speed can still earn a B
   _calcGrade(acc, avg) {
-    // Penalise slow reactions (anything over 500ms deducts points)
-    const score = acc - clamp(Math.round((avg - 500) / 50), 0, 30);
-    if (score >= 90) return { letter: 'S', col: '#ffe44d', label: 'LEGEND'      };
-    if (score >= 75) return { letter: 'A', col: '#44ff88', label: 'SHARP'       };
+    // Slow-reaction penalty: -1 point per 100ms above 800ms, capped at 15
+    const penalty = avg > 0 ? clamp(Math.round((avg - 800) / 100), 0, 15) : 0;
+    const score   = acc - penalty;
+    if (score >= 88) return { letter: 'S', col: '#ffe44d', label: 'LEGEND'      };
+    if (score >= 72) return { letter: 'A', col: '#44ff88', label: 'SHARP'       };
     if (score >= 55) return { letter: 'B', col: '#44aaff', label: 'SOLID'       };
-    if (score >= 35) return { letter: 'C', col: '#cc88ff', label: 'LEARNING'    };
-    return               { letter: 'D', col: '#ff5555', label: 'KEEP TRYING'  };
+    if (score >= 38) return { letter: 'C', col: '#cc88ff', label: 'LEARNING'    };
+    return                  { letter: 'D', col: '#ff5555', label: 'KEEP TRYING' };
   }
 
   // Return a random training tip (called once per game-end, stored in _currentTip)
