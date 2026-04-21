@@ -1744,7 +1744,7 @@ class Game {
     // Score number
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.font      = `${Math.round(BASE_H * 0.028)}px Arial`;
-    const penalty = avg > 0 ? clamp(Math.round((avg - 800) / 100), 0, 15) : 0;
+    const penalty = avg > 0 ? clamp(Math.round((avg - 1200) / 150), 0, 10) : 0;
     ctx.fillText(`Score: ${acc - penalty}`, gpx + gpw / 2, gpy + gph * 0.84);
     ctx.textAlign = 'left';
 
@@ -1759,19 +1759,29 @@ class Game {
     this._drawButton(ctx, BASE_W / 2, BASE_H * 0.885, 280, 62, '▶  PLAY AGAIN', '#990040', '#ff2080');
   }
 
-  // Calculate the performance grade based on accuracy and average reaction time.
-  // Calibrated against typical aim trainer benchmarks (Kovaaks / Aimlabs style):
-  //   - Accuracy is the primary driver; most players peak at 60-85% on moving targets
-  //   - Reaction time penalty only applies above 800ms (very slow), max 15 points
-  //   - This means a 70% accuracy player with good speed can still earn a B
+  // Calculate the performance grade.
+  //
+  // This game is significantly harder than static aim trainers — the target
+  // hops, shrinks with difficulty, and changes direction mid-air. Grading is
+  // calibrated for that reality:
+  //
+  //   Accuracy reference points for a hopping/shrinking target:
+  //     25-35% = beginner finding their footing
+  //     40-55% = developing, landing more than half
+  //     56-70% = solid — consistently tracking a moving target
+  //     71-82% = sharp — very good reflex/tracking combination
+  //     83%+   = legend — exceptional on this style of target
+  //
+  //   Reaction time: only penalised above 1200ms (genuinely slow).
+  //   A fast player clicking at 600-900ms on a hopping target is doing well.
+  //   Max penalty is 10 points so a single slow metric doesn't sink the grade.
   _calcGrade(acc, avg) {
-    // Slow-reaction penalty: -1 point per 100ms above 800ms, capped at 15
-    const penalty = avg > 0 ? clamp(Math.round((avg - 800) / 100), 0, 15) : 0;
+    const penalty = avg > 0 ? clamp(Math.round((avg - 1200) / 150), 0, 10) : 0;
     const score   = acc - penalty;
-    if (score >= 88) return { letter: 'S', col: '#ffe44d', label: 'LEGEND'      };
-    if (score >= 72) return { letter: 'A', col: '#44ff88', label: 'SHARP'       };
-    if (score >= 55) return { letter: 'B', col: '#44aaff', label: 'SOLID'       };
-    if (score >= 38) return { letter: 'C', col: '#cc88ff', label: 'LEARNING'    };
+    if (score >= 83) return { letter: 'S', col: '#ffe44d', label: 'LEGEND'      };
+    if (score >= 71) return { letter: 'A', col: '#44ff88', label: 'SHARP'       };
+    if (score >= 56) return { letter: 'B', col: '#44aaff', label: 'SOLID'       };
+    if (score >= 40) return { letter: 'C', col: '#cc88ff', label: 'LEARNING'    };
     return                  { letter: 'D', col: '#ff5555', label: 'KEEP TRYING' };
   }
 
